@@ -43,9 +43,9 @@ VPPS is built in layered stages to isolate and normalize informational dominance
 
    Both impulses are smoothed to extract their dominant phase:
 
-   $P_t = EMA(ΔPₜ, n)$
+   $P_t = EMA(\Delta P_t, n)$
 
-   $V_t = EMA(ΔVₜ, n)$
+   $V_t = EMA(\Delta V_t, n)$
 
    This approximates the directional phase of price and volume impulses.
 
@@ -65,7 +65,7 @@ VPPS is built in layered stages to isolate and normalize informational dominance
 
    The core signal is the difference between normalized impulses:
 
-   $VPPS_{raw_t} = P^*_t − V^*_t$
+   $VPPS_{raw_t} = P^* _t − V^* _t$
 
    Interpretation:
 
