@@ -33,19 +33,19 @@ VPPS is built in layered stages to isolate and normalize informational dominance
 
 1. Impulse Extraction
 
-   We analyze changes rather than absolute values to capture new information:
+   We analyze changes rather than absolute values:
 
-   ΔPₜ = Closeₜ − Closeₜ₋₁
+   $\Delta P_t = Close_t − Close_{t-1}$
 
-   ΔVₜ = Volumeₜ − Volumeₜ₋₁
+   $\Delta V_t = Volume_t − Volume_{t-1}$
 
 3. Phase Smoothing
 
    Both impulses are smoothed to extract their dominant phase:
 
-   Pₜ = EMA(ΔPₜ, n)
+   $P_t = EMA(ΔPₜ, n)$
 
-   Vₜ = EMA(ΔVₜ, n)
+   $V_t = EMA(ΔVₜ, n)$
 
    This approximates the directional phase of price and volume impulses.
 
@@ -53,11 +53,11 @@ VPPS is built in layered stages to isolate and normalize informational dominance
 
    Price impulses are normalized by volatility:
 
-   P*ₜ = Pₜ / ATRₙ
+   $P^*_t = \frac{P_t}{ATR_n}$
 
    Volume impulses are normalized by average traded volume:
 
-   V*ₜ = Vₜ / SMA(Volume, n)
+   $V^*_t = \frac{V_t}{SMA(Volume, n)}$
 
    This ensures consistent behavior across assets and timeframes.
 
@@ -65,38 +65,39 @@ VPPS is built in layered stages to isolate and normalize informational dominance
 
    The core signal is the difference between normalized impulses:
 
-   VPPS_rawₜ = Pₜ − Vₜ
+   $VPPS_{raw_t} = P_t − V_t$
 
-Interpretation:
+   Interpretation:
 
-* Positive values indicate price leading volume
-* Negative values indicate volume leading price
+   * Positive values indicate price leading volume
+   * Negative values indicate volume leading price
 
 5. Adaptive Statistical Expansion
 
-Smoothing and normalization naturally compress signal amplitude.
-To restore meaningful dynamic range without arbitrary scaling, VPPS applies Z-score expansion:
+   Smoothing and normalization naturally compress signal amplitude.
 
-Zₜ = (VPPS_rawₜ − μ) / σ
+   To restore meaningful dynamic range without arbitrary scaling, VPPS applies Z-score expansion:
 
-Where:
+   $Z_t = \frac{(VPPS_{raw_t} − μ)}{σ}$
 
-* μ is the rolling mean of VPPS_raw
-* σ is the rolling standard deviation
+   Where:
 
-This makes VPPS self-normalizing and regime-adaptive.
+   * $μ$ is the rolling mean of VPPS_raw
+   * $σ$ is the rolling standard deviation
+
+   This makes VPPS self-normalizing and regime-adaptive.
 
 6. Soft Saturation and Scaling
 
-To prevent instability while preserving extremes, a soft saturation function is applied:
+   To prevent instability while preserving extremes, a soft saturation function is applied:
 
-Sₜ = (Zₜ · g) / (1 + |Zₜ · g|)
+   $S_t = \frac{Z_t \cdot g}{1 + |Z_t \cdot g|}$
 
-The final oscillator is mapped to a 0–100 scale:
+   The final oscillator is mapped to a 0–100 scale:
 
-VPPSₜ = 50 + 50 · Sₜ
+   $VPPS_t = 50 + 50 · S_t$
 
-Values may exceed this range during extreme conditions.
+   Values may exceed this range during extreme conditions.
 
 # Interpretation
 
@@ -104,24 +105,20 @@ VPPS is a phase-lead oscillator, not a momentum or volume-strength indicator.
 
 # Zone Interpretation
 
-VPPS > 80
-Price significantly leading volume — potential exhaustion or weak continuation
+VPPS > 80:      Price significantly leading volume — potential exhaustion or weak continuation
 
-VPPS 50–80
-Price slightly ahead of volume
+VPPS 50–80:      Price slightly ahead of volume
 
-VPPS 20–50
-Volume leading price — constructive participation
+VPPS 20–50:      Volume leading price — constructive participation
 
-VPPS < 20
-Strong accumulation or distribution
+VPPS < 20:      Strong accumulation or distribution
 
 # Key Behavioral Insights
 
-* Low VPPS before breakouts suggests higher probability of follow-through
-* Rising VPPS during trends indicates weakening participation
-* Falling VPPS in ranges often signals stealth accumulation
-* Persistent extremes reflect regime imbalance
+   * Low VPPS before breakouts suggests higher probability of follow-through
+   * Rising VPPS during trends indicates weakening participation
+   * Falling VPPS in ranges often signals stealth accumulation
+   * Persistent extremes reflect regime imbalance
 
 VPPS is most effective as a context filter, not a standalone signal generator.
 
@@ -131,34 +128,27 @@ VPPS is not:
 
 On-Balance Volume (OBV)
 
-* A volume oscillator
-* A correlation metric
-* A momentum indicator
+   * A volume oscillator
+   * A correlation metric
+   * A momentum indicator
 
 It does not measure how much volume traded.
+
 It measures when volume acted relative to price.
 
 # Practical Use Cases
 
-* Breakout validation
-* Accumulation and distribution detection
-* Trend exhaustion analysis
-* Regime filtering for momentum systems
+   * Breakout validation
+   * Accumulation and distribution detection
+   * Trend exhaustion analysis
+   * Regime filtering for momentum systems
 
 VPPS is designed to complement price-based indicators, not replace them.
 
 # Design Principles
 
-* Non-repainting
-* Volatility-aware
-* Asset-agnostic
-* Regime-sensitive
-* Information-theoretic rather than price-centric
+   * Volatility-aware
+   * Asset-agnostic
+   * Regime-sensitive
+   * Information-theoretic rather than price-centric
 
-# Summary
-
-Volume-Price Phase Shift (VPPS) provides a structural view of market participation by measuring phase dominance between price and volume impulses.
-
-It answers a simple but powerful question:
-
-Is the market moving because participants are committed, or because price is temporarily outrunning participation?
