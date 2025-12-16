@@ -1,0 +1,285 @@
+//@version=6
+// @mortenmus2004 VPPS v1
+indicator("Volume-Price Phase Shift (VPPS)", overlay=false)
+
+// Inputs
+phaseLen   = input.int(14, "Phase Length", minval=2)
+zLen       = input.int(50, "Z-Score Length", minval=10)
+smoothLen  = input.int(5, "Smoothing", minval=1)
+atrLen     = input.int(14, "ATR Length", minval=2)
+gain       = input.float(1.6, "Sensitivity", step=0.1)
+
+// Shading Customization
+showShading = input.bool(true, "Show Shading", group="Shading Settings")
+showZones = input.bool(true, "Show Zone Lines", group="Shading Settings")
+
+// Color inputs with default values
+zone1Color = input.color(color.green, "Zone 1 (0-20) Color", group="Shading Settings")
+zone2Color = input.color(color.new(#add8e6, 0), "Zone 2 (20-50) Color", group="Shading Settings")
+zone3Color = input.color(color.orange, "Zone 3 (50-80) Color", group="Shading Settings")
+zone4Color = input.color(color.red, "Zone 4 (80-100) Color", group="Shading Settings")
+
+// Extract RGB components from colors
+getRed(color col) =>
+    color.r(col)
+
+getGreen(color col) =>
+    color.g(col)
+
+getBlue(color col) =>
+    color.b(col)
+
+// Convert input colors to RGB values
+zone1Color_r = getRed(zone1Color)
+zone1Color_g = getGreen(zone1Color)
+zone1Color_b = getBlue(zone1Color)
+
+zone2Color_r = getRed(zone2Color)
+zone2Color_g = getGreen(zone2Color)
+zone2Color_b = getBlue(zone2Color)
+
+zone3Color_r = getRed(zone3Color)
+zone3Color_g = getGreen(zone3Color)
+zone3Color_b = getBlue(zone3Color)
+
+zone4Color_r = getRed(zone4Color)
+zone4Color_g = getGreen(zone4Color)
+zone4Color_b = getBlue(zone4Color)
+
+midlineOpacity = input.int(1, "Midline Opacity %", minval=0, maxval=100, group="Shading Settings")
+edgeOpacity = input.int(95, "Edge Opacity %", minval=0, maxval=100, group="Shading Settings")
+zone2MaxOpacity = input.int(5, "Zone 2 Max Opacity %", minval=0, maxval=100, group="Shading Settings")
+zone3MaxOpacity = input.int(5, "Zone 3 Max Opacity %", minval=0, maxval=100, group="Shading Settings")
+
+// Zone thresholds
+zone1Max = input.float(20, "Zone 1 Max", minval=0, maxval=50, group="Zone Thresholds")
+zone2Max = input.float(50, "Zone 2 Max", minval=20, maxval=80, group="Zone Thresholds")
+zone3Max = input.float(80, "Zone 3 Max", minval=50, maxval=100, group="Zone Thresholds")
+
+// Blending options
+useSmoothBlending = input.bool(false, "Smooth Color Blending", group="Shading Settings")
+blendTransitionWidth = input.float(8, "Blend Transition Width", minval=1, maxval=30, group="Shading Settings")
+
+// Price & Volume Changes
+dPrice  = close - close[1]
+dVolume = volume - volume[1]
+
+// Phase Extraction
+pricePhase  = ta.ema(dPrice, phaseLen)
+volumePhase = ta.ema(dVolume, phaseLen)
+
+// Normalize Price
+atr = ta.atr(atrLen)
+priceNorm = atr != 0 ? pricePhase / atr : 0
+
+// Normalize Volume
+volAvg = ta.sma(volume, atrLen)
+volumeNorm = volAvg != 0 ? volumePhase / volAvg : 0
+
+// Phase Shift
+vpps_raw = priceNorm - volumeNorm
+
+// Z-Score Expansion
+mean = ta.sma(vpps_raw, zLen)
+dev  = ta.stdev(vpps_raw, zLen)
+z = dev != 0 ? (vpps_raw - mean) / dev : 0
+
+// Saturation 
+vpps_sat = (z * gain) / (1 + math.abs(z * gain))
+
+// Scale to Oscillator
+vpps = ta.ema(50 + 50 * vpps_sat, smoothLen)
+
+// Plots
+p_vpps = plot(vpps, title="VPPS", color=color.new(color.blue, 0), linewidth=2)
+p_mid = plot(50, title="Balanced", color=color.new(color.gray, 80))
+
+hline(zone3Max, "Zone 3/4 Boundary", color=showZones ? color.new(color.red, 65) : na, linestyle=hline.style_dashed)
+hline(zone2Max, "Zone 2/3 Boundary", color=showZones ? color.new(color.orange, 65) : na, linestyle=hline.style_dashed)
+hline(zone1Max, "Zone 1/2 Boundary", color=showZones ? color.new(color.green, 65) : na, linestyle=hline.style_dashed)
+
+// Custom Shade Effect
+color fill_color = color.new(color.white, 100) // Fully transparent by default
+float opacity_val = 0.0
+float zone_opacity_calc = 0.0
+
+if showShading
+    if vpps >= zone3Max
+        // Zone 4: Red zone
+        if vpps >= 100
+            opacity_val := edgeOpacity
+            fill_color := color.new(zone4Color, 100 - opacity_val)
+        else
+            float red_intensity = (vpps - zone3Max) / (100 - zone3Max)
+            opacity_val := midlineOpacity + (edgeOpacity - midlineOpacity) * red_intensity
+            
+            if useSmoothBlending and vpps < (zone3Max + blendTransitionWidth)
+                // Smooth blend from zone 3 to zone 4
+                float blend_factor = (vpps - zone3Max) / blendTransitionWidth
+                blend_factor := math.min(1.0, blend_factor)
+                
+                int r = math.round(zone3Color_r * (1 - blend_factor) + zone4Color_r * blend_factor)
+                int g = math.round(zone3Color_g * (1 - blend_factor) + zone4Color_g * blend_factor)
+                int b = math.round(zone3Color_b * (1 - blend_factor) + zone4Color_b * blend_factor)
+                
+                fill_color := color.rgb(r, g, b, 100 - opacity_val)
+            else
+                fill_color := color.new(zone4Color, 100 - opacity_val)
+            
+    else if vpps >= zone2Max
+        // Zone 3
+        float zone3_range = zone3Max - zone2Max
+        float zone3_position = (vpps - zone2Max) / zone3_range
+        
+        // Opacity based on position in zone
+        if zone3_position <= 0.5
+            // First half: increasing from midline
+            zone_opacity_calc := midlineOpacity + (zone3MaxOpacity  - midlineOpacity) * (zone3_position * 2)
+        else
+            // Second half: decreasing toward next zone
+            zone_opacity_calc := zone3MaxOpacity  - (zone3MaxOpacity  - midlineOpacity) * ((zone3_position - 0.5) * 2)
+        
+        opacity_val := zone_opacity_calc
+        
+        if useSmoothBlending
+            // Smooth blending within zone 3
+            if vpps < (zone2Max + blendTransitionWidth)
+                // Blend from zone 2 to zone 3
+                float blend_factor = (vpps - zone2Max) / blendTransitionWidth
+                blend_factor := math.min(1.0, blend_factor)
+                
+                int r = math.round(zone2Color_r * (1 - blend_factor) + zone3Color_r * blend_factor)
+                int g = math.round(zone2Color_g * (1 - blend_factor) + zone3Color_g * blend_factor)
+                int b = math.round(zone2Color_b * (1 - blend_factor) + zone3Color_b * blend_factor)
+                
+                fill_color := color.rgb(r, g, b, 100 - opacity_val)
+            else if vpps > (zone3Max - blendTransitionWidth)
+                // Blend from zone 3 to zone 4
+                float blend_factor = (zone3Max - vpps) / blendTransitionWidth
+                blend_factor := math.min(1.0, blend_factor)
+                
+                // Use zone3MaxOpacity for the target opacity
+                float target_opacity = math.min(edgeOpacity, zone3MaxOpacity)
+                opacity_val := math.min(zone_opacity_calc, target_opacity)
+
+                int r = math.round(zone3Color_r * blend_factor + zone4Color_r * (1 - blend_factor))
+                int g = math.round(zone3Color_g * blend_factor + zone4Color_g * (1 - blend_factor))
+                int b = math.round(zone3Color_b * blend_factor + zone4Color_b * (1 - blend_factor))
+                
+                fill_color := color.rgb(r, g, b, 100 - opacity_val)
+            else
+                // Pure zone 3 color
+                fill_color := color.new(zone3Color, 100 - opacity_val)
+        else
+            fill_color := color.new(zone3Color, 100 - opacity_val)
+            
+    else if vpps >= zone1Max
+        // Zone 2:
+        float zone2_range = zone2Max - zone1Max
+        float zone2_position = (vpps - zone1Max) / zone2_range
+        
+        // Opacity based on position in zone
+        if zone2_position <= 0.5
+            // First half: increasing from zone 1 boundary
+            zone_opacity_calc := edgeOpacity - (edgeOpacity - midlineOpacity) * (zone2_position * 2)
+            // Cap at zone2MaxOpacity
+            zone_opacity_calc := math.min(zone_opacity_calc, zone2MaxOpacity)
+        else
+            // Second half: decreasing toward midline
+            zone_opacity_calc := midlineOpacity + (edgeOpacity - midlineOpacity) * ((zone2_position - 0.5) * 2)
+            // Cap at zone2MaxOpacity
+            zone_opacity_calc := math.min(zone_opacity_calc, zone2MaxOpacity)
+        
+        opacity_val := zone_opacity_calc
+        
+        if useSmoothBlending
+            // Smooth blending within zone 2
+            if vpps < (zone1Max + blendTransitionWidth)
+                // Blend from zone 1 to zone 2
+                float blend_factor = (vpps - zone1Max) / blendTransitionWidth
+                blend_factor := math.min(1.0, blend_factor)
+                
+                int r = math.round(zone1Color_r * (1 - blend_factor) + zone2Color_r * blend_factor)
+                int g = math.round(zone1Color_g * (1 - blend_factor) + zone2Color_g * blend_factor)
+                int b = math.round(zone1Color_b * (1 - blend_factor) + zone2Color_b * blend_factor)
+                
+                fill_color := color.rgb(r, g, b, 100 - opacity_val)
+            else if vpps > (zone2Max - blendTransitionWidth)
+                // Blend from zone 2 to zone 3
+                float blend_factor = (zone2Max - vpps) / blendTransitionWidth
+                blend_factor := math.min(1.0, blend_factor)
+                
+                int r = math.round(zone2Color_r * blend_factor + zone3Color_r * (1 - blend_factor))
+                int g = math.round(zone2Color_g * blend_factor + zone3Color_g * (1 - blend_factor))
+                int b = math.round(zone2Color_b * blend_factor + zone3Color_b * (1 - blend_factor))
+                
+                fill_color := color.rgb(r, g, b, 100 - opacity_val)
+            else
+                // Pure zone 2 color
+                fill_color := color.new(zone2Color, 100 - opacity_val)
+        else
+            fill_color := color.new(zone2Color, 100 - opacity_val)
+            
+    else
+        // Zone 1: Green zone 
+        if vpps <= 0
+            opacity_val := edgeOpacity
+            fill_color := color.new(zone1Color, 100 - opacity_val)
+        else
+            float green_intensity = (zone1Max - vpps) / zone1Max
+            opacity_val := midlineOpacity + (edgeOpacity - midlineOpacity) * green_intensity
+            
+            if useSmoothBlending and vpps > (zone1Max - blendTransitionWidth)
+                // Smooth blend to zone 2
+                float blend_factor = (zone1Max - vpps) / blendTransitionWidth
+                blend_factor := math.min(1.0, blend_factor)
+                
+                // Use zone2MaxOpacity for the target opacity
+                float target_opacity = math.min(edgeOpacity, zone2MaxOpacity)
+                opacity_val := midlineOpacity + (target_opacity - midlineOpacity) * green_intensity
+
+                int r = math.round(zone1Color_r * blend_factor + zone2Color_r * (1 - blend_factor))
+                int g = math.round(zone1Color_g * blend_factor + zone2Color_g * (1 - blend_factor))
+                int b = math.round(zone1Color_b * blend_factor + zone2Color_b * (1 - blend_factor))
+                
+                fill_color := color.rgb(r, g, b, 100 - opacity_val)
+            else
+                fill_color := color.new(zone1Color, 100 - opacity_val)
+
+// Apply shading 
+fill(p_vpps, p_mid, color=showShading ? fill_color : na, title="Phase Shade")
+
+// Multi-Timeframe
+higherTF = input.timeframe("60", "Higher Timeframe")
+[mtfPricePhase, mtfVolumePhase, mtfVpps] = request.security(syminfo.tickerid, higherTF, [pricePhase, volumePhase, vpps])
+plot(mtfVpps, "MTF VPPS", color=color.purple, linewidth=1, style=plot.style_linebr)
+
+// Volume Delta
+delta = close > open ? volume : -volume
+deltaNorm = ta.ema(delta, phaseLen) / volAvg
+vpps_raw := priceNorm - volumeNorm + (deltaNorm * 0.5)  // Weight delta lightly
+
+// Info Box
+if barstate.islast
+    var table infoTable = table.new(position.top_right, 4, 3, bgcolor=color.new(color.gray, 90), border_width=1)
+    
+    table.cell(infoTable, 0, 0, "Current VPPS:", text_color=color.gray)
+    table.cell(infoTable, 1, 0, str.tostring(vpps, "#.##"), text_color=color.white)
+    table.cell(infoTable, 0, 1, "Zone:", text_color=color.gray)
+    
+    string zoneText = ""
+    color zoneColor = color.white
+    if vpps >= zone3Max
+        zoneText := "4 (Price Lead)"
+        zoneColor := zone4Color
+    else if vpps >= zone2Max
+        zoneText := "3 (Moderate Price)"
+        zoneColor := zone3Color
+    else if vpps >= zone1Max
+        zoneText := "2 (Moderate Volume)"
+        zoneColor := zone2Color
+    else
+        zoneText := "1 (Volume Lead)"
+        zoneColor := zone1Color
+    
+    table.cell(infoTable, 1, 1, zoneText, text_color=zoneColor)
