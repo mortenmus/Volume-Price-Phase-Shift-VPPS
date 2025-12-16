@@ -65,7 +65,7 @@ VPPS is built in layered stages to isolate and normalize informational dominance
 
    The core signal is the difference between normalized impulses:
 
-   $VPPS_{raw_t} = P_t − V_t$
+   $VPPS_{raw_t} = P^*_t − V^*_t$
 
    Interpretation:
 
