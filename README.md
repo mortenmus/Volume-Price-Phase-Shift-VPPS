@@ -144,10 +144,3 @@ It measures when volume acted relative to price.
 
 VPPS is designed to complement price-based indicators, not replace them.
 
-# Design Principles
-
-   * Volatility-aware
-   * Asset-agnostic
-   * Regime-sensitive
-   * Information-theoretic rather than price-centric
-
