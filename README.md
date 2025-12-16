@@ -126,8 +126,7 @@ VPPS is most effective as a context filter, not a standalone signal generator.
 
 VPPS is not:
 
-On-Balance Volume (OBV)
-
+   * On-Balance Volume (OBV)
    * A volume oscillator
    * A correlation metric
    * A momentum indicator
